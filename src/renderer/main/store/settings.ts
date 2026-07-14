@@ -2,7 +2,7 @@ import { action, makeObservable, observable, runInAction } from 'mobx'
 import isUndef from 'licia/isUndef'
 
 export class Settings {
-  language = 'en-US'
+  language = 'zh-CN'
   theme = 'light'
   adbPath = ''
   killAdbWhenExit = false

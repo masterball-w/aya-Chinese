@@ -20,7 +20,7 @@ const langs = {
   'en-US': enUS,
   ar: lang(ar),
   ru: lang(ru),
-  'zh-CN': zhCN,
+  'zh-CN': lang(zhCN),
   tr: lang(tr),
   'zh-TW': lang(zhTW),
   fr: lang(fr),

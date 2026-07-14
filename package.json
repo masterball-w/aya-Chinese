@@ -22,7 +22,11 @@
     "scrcpy": "zx script/scrcpy.mjs",
     "server": "zx script/server.mjs",
     "format": "lsla prettier \"src/**/*.{ts,tsx,scss,css,json}\" \"*.{js,ts,json}\" \"script/*.mjs\" --write",
-    "start": "electron ./dist/main/index.js --inspect=9229",
+    "start": "powershell -Command \"Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue; electron ./dist/main/index.js --inspect=9229\"",
+    "start:clean": "powershell -File ./start.ps1 clean",
+    "start:build": "powershell -File ./start.ps1 build",
+    "start:dev": "powershell -File ./start.ps1 dev",
+    "setup": "powershell -File ./setup.ps1",
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
     "gen:icon": "lsla genIcon --input src/renderer/ --output src/renderer/icon.css --name aya-icon --source src/renderer/icon/",
     "gen:theme": "lsla genTheme --input src/common/theme.json --output src/renderer/theme.scss && lsla genTheme --input src/common/theme.json --output src/common/theme.ts",
@@ -96,5 +100,8 @@
     "webm-muxer": "^5.1.2",
     "xml2js": "^0.6.2",
     "zx": "^8.8.0"
+  },
+  "dependencies": {
+    "luna-drag-selector": "^0.1.0"
   }
 }

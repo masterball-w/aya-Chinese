@@ -150,7 +150,7 @@ function getTemplate(): MenuItemConstructorOptions[] {
       {
         label: t('reportIssue'),
         click() {
-          shell.openExternal('https://github.com/liriliri/aya/issues')
+          shell.openExternal('https://github.com/masterball-w/aya-Chinese/issues')
         },
       },
       {

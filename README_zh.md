@@ -8,9 +8,9 @@
 
 <div align="center">
 
-Android ADB desktop app.
+Android ADB 桌面应用。
 
-[中文](README_zh.md) | English
+中文 | [English](README.md)
 
 <a href="https://www.producthunt.com/posts/aya-1?embed=true&utm_source=badge-featured&utm_medium=badge&utm_souce=badge-aya&#0045;1" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=899538&theme=light&t=1740125747753" alt="AYA - Open&#0032;source&#0032;desktop&#0032;app&#0032;for&#0032;controlling&#0032;android&#0032;devices | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a>
 
@@ -31,34 +31,34 @@ Android ADB desktop app.
 
 <img src="https://aya.liriliri.io/screencast.png" style="width:100%">
 
-[AYA](https://aya.liriliri.io/) is a desktop application for easily controlling android devices, which can be considered as a GUI wrapper for ADB.
+[AYA](https://aya.liriliri.io/) 是一款用于轻松控制 Android 设备的桌面应用，可以看作是 ADB 的图形化封装。
 
-## Installation
+## 安装
 
-Click [here](https://github.com/masterball-w/aya-Chinese/releases/) to download and install AYA. Windows x64, Mac arm64, Mac x64 and Linux x86_64 are supported.
+点击[这里](https://github.com/masterball-w/aya-Chinese/releases/)下载并安装 AYA。支持 Windows x64、Mac arm64、Mac x64 和 Linux x86_64。
 
-## Features
+## 功能
 
 <img src="https://aya.liriliri.io/screenshot.png" style="width:100%">
 
-* Screen mirror
-* File explorer
-* Application manager
-* Process monitor
-* Layout inspector
-* CPU, memory and FPS monitor
-* Logcat viewer
-* Interactive shell
+* 屏幕镜像
+* 文件管理器
+* 应用管理器
+* 进程监控
+* 布局检查器
+* CPU、内存和 FPS 监控
+* 日志查看器
+* 交互式终端
 
-For more detailed usage instructions, please read the documentation at [aya.liriliri.io](https://aya.liriliri.io)!
+更详细的使用说明请阅读文档：[aya.liriliri.io](https://aya.liriliri.io/zh/)！
 
-## Related Projects
+## 相关项目
 
-* [licia](https://github.com/liriliri/licia): Utility library used by AYA.
-* [luna](https://github.com/liriliri/luna): UI components used by AYA.
-* [vivy](https://github.com/liriliri/vivy): Icon image generation.
-* [echo](https://github.com/liriliri/echo): Harmony OS version of AYA.
+* [licia](https://github.com/liriliri/licia)：AYA 使用的工具库。
+* [luna](https://github.com/liriliri/luna)：AYA 使用的 UI 组件库。
+* [vivy](https://github.com/liriliri/vivy)：图标生成工具。
+* [echo](https://github.com/liriliri/echo)：AYA 的鸿蒙版本。
 
-## Contribution
+## 贡献
 
-Read [Contributing Guide](https://aya.liriliri.io/guide/contributing.html) for development setup instructions.
+请阅读[贡献指南](https://aya.liriliri.io/zh/guide/contributing.html)了解开发环境配置说明。
