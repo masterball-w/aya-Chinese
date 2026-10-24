@@ -7,6 +7,7 @@
   "deviceNotConnected": "未连接设备",
   "screenshot": "截屏",
   "file": "文件",
+  "album": "相册",
   "xspace": "隐私空间",
   "xspaceMissing": "手机上还没有安装隐私空间助手",
   "xspaceOffline": "助手没有在运行。请先打开手机上的「AYA 隐私空间助手」，并保持 USB 调试连接",
