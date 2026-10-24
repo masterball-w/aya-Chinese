@@ -16,3 +16,4 @@ build/*.provisionprofile
 final-test.log
 startbat-output.log
 electron-output.log
+tmp/
