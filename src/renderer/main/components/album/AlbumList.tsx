@@ -15,6 +15,7 @@ interface IProps {
   onSettings: () => void
   scanning: boolean
   stats: IScanStats | null
+  error?: string | null
   backendId: BackendId
   onBackendChange: (id: BackendId) => void
   clipboardCount?: number
@@ -47,6 +48,7 @@ export default function AlbumList(props: IProps) {
     onSettings,
     scanning,
     stats,
+    error,
     backendId,
     onBackendChange,
     clipboardCount,
@@ -114,13 +116,19 @@ export default function AlbumList(props: IProps) {
       {scanning && (
         <div className={Style.scanProgress}>正在扫描存储,首次扫描可能需要几分钟…</div>
       )}
-      {!scanning && !!clipboardCount && clipboardCount > 0 && (
+      {!scanning && error && (
+        <div className={Style.sourceError}>
+          {error}
+          {backendId === 'xspace' && '。安装并启动助手后,点击「扫描 / 增量刷新」重试'}
+        </div>
+      )}
+      {!scanning && !error && !!clipboardCount && clipboardCount > 0 && (
         <div className={Style.scanProgress}>
           剪贴板中有 {clipboardCount} 张图片,进入目标相册后按 Ctrl+V 或点击「粘贴」即可复制到该相册
         </div>
       )}
       <div className={Style.albumScroll}>
-        {sorted.length === 0 && !scanning && (
+        {sorted.length === 0 && !scanning && !error && (
           <div className={Style.empty}>
             没有发现相册。可尝试降低阈值(设置中修改)或点击「扫描」。
           </div>

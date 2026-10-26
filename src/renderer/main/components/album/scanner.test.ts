@@ -10,6 +10,7 @@ import {
   isImageName,
   joinPath,
   parseDirListing,
+  scanDevice,
   toDirStat,
   uniqueName,
 } from './scanner'
@@ -128,7 +129,105 @@ assert(
   '相册时间为最新图片 mtime'
 )
 
-console.log(`\n结果: ${passed} 通过, ${failed} 失败`)
-if (failed > 0) {
-  process.exit(1)
+console.log(`\n同步逻辑: ${passed} 通过, ${failed} 失败`)
+
+// ---- scanDevice(异步,模拟 readDir,不依赖设备) ----
+function fakeEntry(name: string, directory: boolean, mtime: number) {
+  return { name, directory, mtime: new Date(mtime), size: directory ? 0 : 1 }
 }
+
+function imagesFor(path: string, count: number, startMtime: number) {
+  const out: any[] = []
+  for (let i = 0; i < count; i++) {
+    out.push(fakeEntry(`img${i}.jpg`, false, startMtime + i))
+  }
+  return out
+}
+
+async function runScanTests() {
+  // 场景一:根目录读取失败(如隐私空间助手未运行)应整体抛出原始错误,
+  // 而不是静默返回 0 相册
+  let rootError: any = null
+  try {
+    await scanDevice({
+      deviceId: 'd',
+      root: '/storage/emulated/666',
+      threshold: 5,
+      excludedNames: ['Android'],
+      excludeHidden: true,
+      respectNoMedia: true,
+      concurrency: 2,
+      cache: {},
+      readDir: async () => {
+        throw new Error('helper_offline')
+      },
+    })
+  } catch (err: any) {
+    rootError = err
+  }
+  assert(
+    !!rootError && rootError.message.includes('helper_offline'),
+    '根目录读取失败时应抛出原始错误(helper_offline)'
+  )
+
+  // 场景二:子目录读取失败被跳过,不影响其余相册发现
+  const tree: { [path: string]: any[] } = {
+    '/storage/emulated/666': [fakeEntry('A', true, 100), fakeEntry('B', true, 200)],
+    '/storage/emulated/666/A': imagesFor('/storage/emulated/666/A', 6, 1000),
+  }
+  const result = await scanDevice({
+    deviceId: 'd',
+    root: '/storage/emulated/666',
+    threshold: 5,
+    excludedNames: ['Android'],
+    excludeHidden: true,
+    respectNoMedia: true,
+    concurrency: 2,
+    cache: {},
+    readDir: async (deviceId: string, path: string) => {
+      if (!tree[path]) {
+        throw new Error('no such dir: ' + path)
+      }
+      return tree[path]
+    },
+  })
+  assert(
+    result.albums.length === 1 && result.albums[0].path === '/storage/emulated/666/A',
+    '子目录 B 读取失败被跳过,仍发现相册 A'
+  )
+
+  // 场景三:目录 mtime 未变时第二次扫描复用缓存
+  const result2 = await scanDevice({
+    deviceId: 'd',
+    root: '/storage/emulated/666',
+    threshold: 5,
+    excludedNames: ['Android'],
+    excludeHidden: true,
+    respectNoMedia: true,
+    concurrency: 2,
+    cache: result.cache,
+    readDir: async (deviceId: string, path: string) => {
+      if (!tree[path]) {
+        throw new Error('no such dir: ' + path)
+      }
+      return tree[path]
+    },
+  })
+  assert(result2.stats.reusedDirs > 0, '未变化的目录复用扫描缓存')
+  assert(
+    result2.albums.length === result.albums.length,
+    '复用缓存的重扫结果与首次一致'
+  )
+}
+
+runScanTests()
+  .catch((err) => {
+    failed++
+    console.error('FAIL: scanDevice 测试异常:', err)
+  })
+  .finally(() => {
+    console.log(`\n结果: ${passed} 通过, ${failed} 失败`)
+    if (failed > 0) {
+      process.exit(1)
+    }
+  })

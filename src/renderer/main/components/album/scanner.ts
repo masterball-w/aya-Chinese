@@ -225,6 +225,9 @@ export async function scanDevice(options: IScanOptions): Promise<IScanResult> {
 
   let pending = 0
   let aborted = false
+  // 根目录读取失败(如隐私空间助手未运行)时携带原始错误整体失败,
+  // 避免静默返回 0 相册让用户误以为没有照片
+  let rootError: unknown = null
   let resolveAll: () => void
   const allDone = new Promise<void>((resolve) => {
     resolveAll = resolve
@@ -250,7 +253,16 @@ export async function scanDevice(options: IScanOptions): Promise<IScanResult> {
           stats.reusedDirs++
           stats.images += cached.imgCount
         } else {
-          const files: IFile[] = await readDir(deviceId, path)
+          let files: IFile[]
+          try {
+            files = await readDir(deviceId, path)
+          } catch (err) {
+            if (path === root) {
+              rootError = err
+              aborted = true
+            }
+            throw err
+          }
           const parsed = parseDirListing(path, files)
           stat = toDirStat(expectedMtime, parsed.images, parsed.subdirs, parsed.noMedia)
           stats.readDirs++
@@ -295,6 +307,10 @@ export async function scanDevice(options: IScanOptions): Promise<IScanResult> {
   visit(root, 0)
 
   await allDone
+
+  if (rootError) {
+    throw rootError
+  }
 
   const albums = computeAlbums(root, dirs, threshold)
 

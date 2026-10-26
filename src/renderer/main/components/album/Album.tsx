@@ -37,6 +37,7 @@ export default observer(function Album() {
   const [current, setCurrent] = useState<IAlbum | null>(null)
   const [clipboard, setClipboard] = useState<IClipboard | null>(null)
   const [showSettings, setShowSettings] = useState(false)
+  const [sourceError, setSourceError] = useState<string | null>(null)
   const scanTokenRef = useRef(0)
   const lastDeviceIdRef = useRef<string | undefined>(undefined)
 
@@ -47,16 +48,27 @@ export default observer(function Album() {
     let alive = true
     // 立即作废上一个数据源的配置,避免切换瞬间用旧配置触发扫描
     setConfig(null)
+    setSourceError(null)
     void (async () => {
       let loaded = loadConfig(device.id, backendId)
-      // 隐私空间首次使用时自动探测卷根目录作为扫描根
+      // 隐私空间首次使用时自动探测卷根目录作为扫描根;
+      // 助手缺失/未运行时给出中文提示并跳过注定失败的自动扫描
       if (backendId === 'xspace' && !hasStoredConfig(device.id, backendId)) {
-        const root = await backend.detectRoot(device.id)
-        if (!alive) {
+        try {
+          const root = await backend.detectRoot(device.id)
+          if (root) {
+            loaded = { ...loaded, scanRoot: root }
+          }
+        } catch (err: any) {
+          if (!alive) {
+            return
+          }
+          setSourceError(explainXspaceError(err))
+          setConfig(loaded)
+          setThumbLongSide(loaded.thumbLongSide)
+          setCache({})
+          setAlbums([])
           return
-        }
-        if (root) {
-          loaded = { ...loaded, scanRoot: root }
         }
       }
       if (!alive) {
@@ -123,14 +135,15 @@ export default observer(function Album() {
       setCache(result.cache)
       setAlbums(result.albums)
       setStats(result.stats)
+      setSourceError(null)
       saveScanCache(device.id, backendId, result.cache)
     } catch (err: any) {
-      notify(
+      const message =
         backendId === 'xspace'
           ? explainXspaceError(err)
-          : err?.message || '扫描失败',
-        { icon: 'error' }
-      )
+          : err?.message || '扫描失败'
+      setSourceError(message)
+      notify(message, { icon: 'error' })
     } finally {
       if (scanTokenRef.current === token) {
         setScanning(false)
@@ -178,6 +191,7 @@ export default observer(function Album() {
           onSettings={() => setShowSettings(true)}
           scanning={scanning}
           stats={stats}
+          error={sourceError}
           backendId={backendId}
           onBackendChange={(id) => {
             setCurrent(null)

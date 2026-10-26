@@ -42,9 +42,10 @@
 ### 四、隐私空间(vivo XSpace)
 
 - 相册列表左上角可在「主空间 / 隐私空间」之间切换,两边的配置、扫描缓存、剪贴板相互独立
-- 前提:手机上安装并运行「AYA 隐私空间助手」(即 aya「隐私空间」面板所依赖的同一个助手);未安装/未运行时切换会给出中文提示,不影响主空间功能
+- 前提:手机上安装并运行「AYA 隐私空间助手」(即 aya「隐私空间」面板所依赖的同一个助手);未安装/未运行时切换会在列表顶部显示中文提示横幅(并跳过注定失败的自动扫描),不影响主空间功能
 - 首次进入隐私空间时自动探测卷根目录(如 `/storage/emulated/666`)并作为扫描根,可在设置中修改
 - 相册发现、浏览、缩略图、批量选择/删除/复制/粘贴能力与主空间完全一致;默认排除规则同样生效(`.vivoFileRecycleBin` 等隐藏目录会被排除)
+- 助手中途离线时:扫描会在列表顶部显示错误横幅(不会静默返回「没有发现相册」);已打开的相册会显示读取错误而非一直「加载中…」
 - 限制:剪贴板按数据源绑定,**不支持主空间 ↔ 隐私空间互贴**(两端文件系统隔离,助手 API 不提供跨空间写入)
 
 ## 安装
@@ -123,9 +124,10 @@ npx esbuild --bundle src/renderer/main/components/album/album.e2e.ts \
 # 应用内验证(CDP):启动 AYA 时加 --remote-debugging-port=9229,然后
 node src/renderer/main/components/album/verifyAlbum.cjs
 node src/renderer/main/components/album/verifyBatch.cjs
+node src/renderer/main/components/album/verifyXspace.cjs
 ```
 
-CDP 验证脚本注意:页面里第一个 `button` 是应用工具栏按钮,定位按钮要按文字匹配,不能按序号。隐私空间相册的 CDP 验证脚本尚未编写(现有两个脚本只覆盖主空间流程,可参照改造:切换数据源按钮文字为「隐私空间」)。
+CDP 验证脚本注意:页面里第一个 `button` 是应用工具栏按钮,定位按钮要按文字匹配,不能按序号。`verifyXspace.cjs` 覆盖隐私空间流程(数据源切换、根目录探测、扫描浏览、缩略图、选择、复制/粘贴/删除且自动清理测试数据);助手未安装/未运行时仅验证中文提示横幅并整体 SKIP,不算失败。
 
 测试目录结构(验收用,可随时删除):`/sdcard/AyaAlbumTest/{album1(6 张)、album2/sub1+sub2(3+3)、few(3 张)、.hidden(6 张)、nomedia(6 张 + .nomedia)}`。删除命令:
 
@@ -146,7 +148,8 @@ album/
 ├── thumbCache.ts      IndexedDB 缩略图缓存
 ├── config.ts          配置与扫描缓存的持久化(按设备+数据源隔离)
 ├── types.ts           类型定义
-├── scanner.test.ts    纯逻辑单测
+├── scanner.test.ts    纯逻辑单测(含 scanDevice 模拟 readDir 的异步用例)
 ├── album.e2e.ts       真机端到端测试(主空间)
+├── verifyXspace.cjs   应用内 CDP 验证(隐私空间,助手缺失时 SKIP)
 └── Album.module.scss  样式(跟随 AYA 主题变量)
 ```
