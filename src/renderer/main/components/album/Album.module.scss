@@ -253,6 +253,13 @@
   user-select: none;
 }
 
+.gridWrap {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+}
+
 .gridViewport {
   flex: 1;
   overflow-y: auto;
@@ -271,10 +278,12 @@
 }
 
 .viewer {
-  position: fixed;
+  /* 只覆盖缩略图网格区域(包含块为 gridWrap),相册工具栏及其上方的一切
+     (标签栏、标题栏、各种弹层)都不被遮挡;纯黑背景避免底下内容透出 */
+  position: absolute;
   inset: 0;
-  z-index: 1000;
-  background: rgba(0, 0, 0, 0.82);
+  z-index: 1;
+  background: #000;
   display: flex;
   flex-direction: column;
 }
@@ -321,7 +330,8 @@
 .modalMask {
   position: fixed;
   inset: 0;
-  z-index: 1001;
+  /* 高于查看器(z1),仍低于应用其他弹层(1000+) */
+  z-index: 2;
   background: rgba(0, 0, 0, 0.45);
   display: flex;
   align-items: center;
