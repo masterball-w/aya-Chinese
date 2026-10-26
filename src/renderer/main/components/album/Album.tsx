@@ -2,8 +2,10 @@ import { observer } from 'mobx-react-lite'
 import { useEffect, useRef, useState } from 'react'
 import store from '../../store'
 import { notify } from 'share/renderer/lib/util'
+import { getBackend, BackendId, explainXspaceError } from './backend'
 import { computeAlbums, scanDevice } from './scanner'
 import {
+  hasStoredConfig,
   loadConfig,
   loadScanCache,
   saveConfig,
@@ -24,6 +26,8 @@ import Style from './Album.module.scss'
 export default observer(function Album() {
   const { device } = store
 
+  const [backendId, setBackendId] = useState<BackendId>('main')
+  const backend = getBackend(backendId)
   const [config, setConfig] = useState<IAlbumConfig | null>(null)
   const [cache, setCache] = useState<IScanCache>({})
   const [albums, setAlbums] = useState<IAlbum[]>([])
@@ -40,28 +44,52 @@ export default observer(function Album() {
     if (!device) {
       return
     }
-    const loaded = loadConfig(device.id)
-    setConfig(loaded)
-    setThumbLongSide(loaded.thumbLongSide)
-    const cached = loadScanCache(device.id)
-    if (cached) {
-      setCache(cached)
-      setAlbums(computeAlbums(loaded.scanRoot, cached, loaded.threshold))
-      setStats(null)
-    } else {
-      setCache({})
-      setAlbums([])
-      // 首次使用自动触发全盘扫描
-      void scan(loaded, {})
+    let alive = true
+    // 立即作废上一个数据源的配置,避免切换瞬间用旧配置触发扫描
+    setConfig(null)
+    void (async () => {
+      let loaded = loadConfig(device.id, backendId)
+      // 隐私空间首次使用时自动探测卷根目录作为扫描根
+      if (backendId === 'xspace' && !hasStoredConfig(device.id, backendId)) {
+        const root = await backend.detectRoot(device.id)
+        if (!alive) {
+          return
+        }
+        if (root) {
+          loaded = { ...loaded, scanRoot: root }
+        }
+      }
+      if (!alive) {
+        return
+      }
+      setConfig(loaded)
+      setThumbLongSide(loaded.thumbLongSide)
+      const cached = loadScanCache(device.id, backendId)
+      if (cached) {
+        setCache(cached)
+        setAlbums(computeAlbums(loaded.scanRoot, cached, loaded.threshold))
+        setStats(null)
+      } else {
+        setCache({})
+        setAlbums([])
+        // 首次使用自动触发扫描
+        void scan(loaded, {})
+      }
+    })()
+    return () => {
+      alive = false
     }
+  }, [device?.id, backendId])
+
+  useEffect(() => {
     // 切换到其他设备时回到相册列表并清空剪贴板(剪贴板按设备绑定;
     // 同一设备断线重连不清空)
     const prevId = lastDeviceIdRef.current
-    lastDeviceIdRef.current = device.id
-    if (prevId !== undefined && prevId !== device.id) {
+    lastDeviceIdRef.current = device?.id
+    if (device && prevId !== undefined && prevId !== device.id) {
       setClipboard(null)
+      setCurrent(null)
     }
-    setCurrent(null)
   }, [device?.id])
 
   async function scan(cfg: IAlbumConfig, baseCache: IScanCache) {
@@ -81,6 +109,7 @@ export default observer(function Album() {
         respectNoMedia: cfg.respectNoMedia,
         concurrency: cfg.concurrency,
         cache: baseCache,
+        readDir: backend.listDir,
         onProgress: (s) => {
           if (scanTokenRef.current === token) {
             setStats(s)
@@ -94,9 +123,14 @@ export default observer(function Album() {
       setCache(result.cache)
       setAlbums(result.albums)
       setStats(result.stats)
-      saveScanCache(device.id, result.cache)
+      saveScanCache(device.id, backendId, result.cache)
     } catch (err: any) {
-      notify(err?.message || '扫描失败', { icon: 'error' })
+      notify(
+        backendId === 'xspace'
+          ? explainXspaceError(err)
+          : err?.message || '扫描失败',
+        { icon: 'error' }
+      )
     } finally {
       if (scanTokenRef.current === token) {
         setScanning(false)
@@ -110,7 +144,7 @@ export default observer(function Album() {
     if (!device) {
       return
     }
-    saveConfig(device.id, next)
+    saveConfig(device.id, backendId, next)
     setThumbLongSide(next.thumbLongSide)
     // 阈值与排除规则变化可直接基于缓存重算,无需重新扫描
     setAlbums(computeAlbums(next.scanRoot, cache, next.threshold))
@@ -126,6 +160,7 @@ export default observer(function Album() {
         <AlbumView
           deviceId={device.id}
           album={current}
+          backend={backend}
           clipboard={clipboard}
           onCopy={setClipboard}
           onAlbumChanged={() => config && scan(config, cache)}
@@ -134,6 +169,7 @@ export default observer(function Album() {
       ) : (
         <AlbumList
           deviceId={device.id}
+          backend={backend}
           albums={albums}
           sortBy={sortBy}
           onSortChange={setSortBy}
@@ -142,8 +178,15 @@ export default observer(function Album() {
           onSettings={() => setShowSettings(true)}
           scanning={scanning}
           stats={stats}
+          backendId={backendId}
+          onBackendChange={(id) => {
+            setCurrent(null)
+            setBackendId(id)
+          }}
           clipboardCount={
-            clipboard && clipboard.deviceId === device.id
+            clipboard &&
+            clipboard.deviceId === device.id &&
+            clipboard.backendId === backendId
               ? clipboard.paths.length
               : 0
           }

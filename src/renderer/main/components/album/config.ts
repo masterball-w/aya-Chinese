@@ -1,4 +1,23 @@
-const CONFIG_PREFIX = 'aya-album-config:'
+import { BackendId } from './backend'
+
+function storageKey(prefix: string, deviceId: string, backendId: BackendId) {
+  return `${prefix}:${deviceId}:${backendId}`
+}
+
+function readWithLegacy(
+  prefix: string,
+  deviceId: string,
+  backendId: BackendId
+): string | null {
+  const current = localStorage.getItem(storageKey(prefix, deviceId, backendId))
+  if (current !== null || backendId !== 'main') {
+    return current
+  }
+  // 兼容 v1 存储键(无后缀),主空间缓存迁移后按新键保存
+  return localStorage.getItem(`${prefix}:${deviceId}`)
+}
+
+const CONFIG_PREFIX = 'aya-album-config'
 
 export interface IAlbumConfig {
   threshold: number
@@ -20,9 +39,12 @@ export const DEFAULT_CONFIG: IAlbumConfig = {
   thumbLongSide: 480,
 }
 
-export function loadConfig(deviceId: string): IAlbumConfig {
+export function loadConfig(
+  deviceId: string,
+  backendId: BackendId = 'main'
+): IAlbumConfig {
   try {
-    const raw = localStorage.getItem(CONFIG_PREFIX + deviceId)
+    const raw = readWithLegacy(CONFIG_PREFIX, deviceId, backendId)
     if (raw) {
       return { ...DEFAULT_CONFIG, ...JSON.parse(raw) }
     }
@@ -32,19 +54,39 @@ export function loadConfig(deviceId: string): IAlbumConfig {
   return { ...DEFAULT_CONFIG }
 }
 
-export function saveConfig(deviceId: string, config: IAlbumConfig) {
+export function saveConfig(
+  deviceId: string,
+  backendId: BackendId,
+  config: IAlbumConfig
+) {
   try {
-    localStorage.setItem(CONFIG_PREFIX + deviceId, JSON.stringify(config))
+    localStorage.setItem(
+      storageKey(CONFIG_PREFIX, deviceId, backendId),
+      JSON.stringify(config)
+    )
   } catch {
     // 存储不可用时忽略
   }
 }
 
-const CACHE_PREFIX = 'aya-album-cache:'
+export function hasStoredConfig(
+  deviceId: string,
+  backendId: BackendId
+): boolean {
+  return (
+    localStorage.getItem(storageKey(CONFIG_PREFIX, deviceId, backendId)) !==
+    null
+  )
+}
 
-export function loadScanCache(deviceId: string) {
+const CACHE_PREFIX = 'aya-album-cache'
+
+export function loadScanCache(
+  deviceId: string,
+  backendId: BackendId = 'main'
+) {
   try {
-    const raw = localStorage.getItem(CACHE_PREFIX + deviceId)
+    const raw = readWithLegacy(CACHE_PREFIX, deviceId, backendId)
     if (raw) {
       return JSON.parse(raw)
     }
@@ -54,9 +96,16 @@ export function loadScanCache(deviceId: string) {
   return null
 }
 
-export function saveScanCache(deviceId: string, cache: unknown) {
+export function saveScanCache(
+  deviceId: string,
+  backendId: BackendId,
+  cache: unknown
+) {
   try {
-    localStorage.setItem(CACHE_PREFIX + deviceId, JSON.stringify(cache))
+    localStorage.setItem(
+      storageKey(CACHE_PREFIX, deviceId, backendId),
+      JSON.stringify(cache)
+    )
   } catch {
     // 超出 localStorage 容量时放弃持久化,仅本次会话内生效
   }

@@ -73,7 +73,7 @@ async function main() {
   }
 
   console.log('== 第一次扫描(全量)==')
-  const first = await scanDevice({ ...base, cache: {} })
+  const first = await scanDevice({ ...base, cache: {}, readDir: adbReadDir })
   for (const album of first.albums) {
     console.log(`相册: ${album.path} (${album.count} 张, own=${album.ownCount})`)
   }
@@ -105,7 +105,7 @@ async function main() {
   expect(first.stats.images === 21, `图片总数 21(实际 ${first.stats.images},.hidden 整个目录被跳过故不计入)`)
 
   console.log('\n== 第二次扫描(增量)==')
-  const second = await scanDevice({ ...base, cache: first.cache })
+  const second = await scanDevice({ ...base, cache: first.cache, readDir: adbReadDir })
   const secondPaths = second.albums.map((a) => a.path).sort()
   expect(
     JSON.stringify(secondPaths) === JSON.stringify(paths.slice().sort()),
@@ -120,7 +120,7 @@ async function main() {
   for (let i = 1; i <= 5; i++) {
     await exec(ADB, ['shell', 'cp', jpg, `/sdcard/AyaAlbumTest/newalbum/n${i}.jpg`])
   }
-  const third = await scanDevice({ ...base, cache: second.cache })
+  const third = await scanDevice({ ...base, cache: second.cache, readDir: adbReadDir })
   const thirdPaths = third.albums.map((a) => a.path)
   expect(thirdPaths.includes('/sdcard/AyaAlbumTest/newalbum'), '新增 5 张图的目录被增量发现')
 

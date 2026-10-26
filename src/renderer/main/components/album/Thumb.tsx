@@ -12,6 +12,7 @@ interface IProps {
   mtime: number
   square?: boolean
   selected?: boolean
+  getUrl?: (path: string) => Promise<string>
   onClick?: (event: React.MouseEvent) => void
   onDoubleClick?: (event: React.MouseEvent) => void
 }
@@ -56,10 +57,13 @@ async function downscale(blob: Blob): Promise<Blob> {
   }
 }
 
+type ResolveUrl = (path: string) => Promise<string>
+
 async function loadThumb(
   key: string,
   deviceId: string,
-  path: string
+  path: string,
+  resolveUrl: ResolveUrl
 ): Promise<string | null> {
   const cached = await getThumb(key)
   if (cached) {
@@ -68,7 +72,7 @@ async function loadThumb(
 
   return new Promise<string | null>((resolve) => {
     fetchSemaphore.wait(() => {
-      generateThumb(key, deviceId, path)
+      generateThumb(key, deviceId, path, resolveUrl)
         .then(resolve)
         .catch(() => {
           // HEIC 等格式 Electron 无法解码、文件被删等情况,降级为占位图
@@ -82,9 +86,10 @@ async function loadThumb(
 async function generateThumb(
   key: string,
   deviceId: string,
-  path: string
+  path: string,
+  resolveUrl: ResolveUrl
 ): Promise<string> {
-  const remote = await main.getFileUrl(deviceId, path)
+  const remote = await resolveUrl(path)
   const resp = await fetch(remote)
   if (!resp.ok) {
     throw new Error(`HTTP ${resp.status}`)
@@ -96,7 +101,7 @@ async function generateThumb(
 }
 
 export default function Thumb(props: IProps) {
-  const { deviceId, path, mtime, square, selected, onClick, onDoubleClick } = props
+  const { deviceId, path, mtime, square, selected, getUrl, onClick, onDoubleClick } = props
   const [url, setUrl] = useState<string | null>(null)
   const [state, setState] = useState<'loading' | 'ok' | 'error'>('loading')
   const urlRef = useRef<string | null>(null)
@@ -104,6 +109,7 @@ export default function Thumb(props: IProps) {
   useEffect(() => {
     let alive = true
     const key = `${deviceId}|${path}|${mtime}`
+    const resolveUrl = getUrl || ((p: string) => main.getFileUrl(deviceId, p))
 
     function setObjectUrl(objectUrl: string) {
       urlRef.current = objectUrl
@@ -115,7 +121,7 @@ export default function Thumb(props: IProps) {
       }
     }
 
-    void loadThumb(key, deviceId, path).then((objectUrl) => {
+    void loadThumb(key, deviceId, path, resolveUrl).then((objectUrl) => {
       if (!alive) {
         return
       }
