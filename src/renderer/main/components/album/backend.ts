@@ -74,12 +74,9 @@ const xspaceBackend: IStorageBackend = {
     return main.xspaceFileUrl(deviceId, path)
   },
   async detectRoot(deviceId) {
-    try {
-      const result = await main.xspaceList(deviceId, '')
-      return result.root || null
-    } catch {
-      return null
-    }
+    // 助手缺失/离线等错误原样抛出,由调用方给出中文提示
+    const result = await main.xspaceList(deviceId, '')
+    return result.root || null
   },
 }
 

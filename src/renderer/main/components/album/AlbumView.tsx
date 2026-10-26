@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import LunaImageViewer from 'luna-image-viewer/react'
 import { notify } from 'share/renderer/lib/util'
-import { IStorageBackend } from './backend'
+import { IStorageBackend, explainXspaceError } from './backend'
 import { baseName, joinPath, listAlbumImages, uniqueName } from './scanner'
 import Thumb from './Thumb'
 import {
@@ -54,6 +54,7 @@ export default function AlbumView(props: IProps) {
   } = props
 
   const [images, setImages] = useState<IImageItem[] | null>(null)
+  const [listError, setListError] = useState<string | null>(null)
   const [size, setSize] = useState<GridSize>('medium')
   const [sortBy, setSortBy] = useState<ImageSortBy>('time')
   const [sortAsc, setSortAsc] = useState(false)
@@ -77,16 +78,31 @@ export default function AlbumView(props: IProps) {
       ? clipboard
       : null
 
+  function explainListError(err: any): string {
+    return backend.id === 'xspace'
+      ? explainXspaceError(err)
+      : err?.message || '目录读取失败'
+  }
+
   useEffect(() => {
     let alive = true
     setImages(null)
+    setListError(null)
     setSelected(new Set())
     anchorRef.current = -1
-    listAlbumImages(deviceId, album.path, backend.listDir).then((items) => {
-      if (alive) {
-        setImages(items)
-      }
-    })
+    listAlbumImages(deviceId, album.path, backend.listDir)
+      .then((items) => {
+        if (alive) {
+          setImages(items)
+        }
+      })
+      .catch((err: any) => {
+        // 助手离线、目录被删等情况:展示错误而不是永远「加载中…」
+        if (alive) {
+          setImages([])
+          setListError(explainListError(err))
+        }
+      })
     return () => {
       alive = false
     }
@@ -181,9 +197,14 @@ export default function AlbumView(props: IProps) {
   }
 
   async function reload() {
-    const items = await listAlbumImages(deviceId, album.path, backend.listDir)
-    setImages(items)
-    setReloadToken((token) => token + 1)
+    try {
+      const items = await listAlbumImages(deviceId, album.path, backend.listDir)
+      setImages(items)
+      setReloadToken((token) => token + 1)
+    } catch (err: any) {
+      setImages([])
+      setListError(explainListError(err))
+    }
   }
 
   async function doDelete() {
@@ -348,7 +369,9 @@ export default function AlbumView(props: IProps) {
           {album.name}
         </div>
         <div className={Style.viewMeta}>
-          {images
+          {listError
+            ? '加载失败'
+            : images
             ? `共 ${images.length} 张` +
               (selected.size > 0 ? `,已选 ${selected.size} 张` : '')
             : '加载中…'}
@@ -430,7 +453,8 @@ export default function AlbumView(props: IProps) {
           })
         }}
       >
-        {images && images.length === 0 && (
+        {listError && <div className={Style.empty}>{listError}</div>}
+        {images && images.length === 0 && !listError && (
           <div className={Style.empty}>相册内没有图片(内容可能已被移动)</div>
         )}
         <div className={Style.gridInner} style={{ height: totalHeight }}>

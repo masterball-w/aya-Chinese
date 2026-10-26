@@ -134,6 +134,13 @@
   border-bottom: 1px solid var(--color-border);
 }
 
+.sourceError {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--color-error, #ff4d4f);
+  border-bottom: 1px solid var(--color-border);
+}
+
 .albumScroll {
   flex: 1;
   overflow-y: auto;
