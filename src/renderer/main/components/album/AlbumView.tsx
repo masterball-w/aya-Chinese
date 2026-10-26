@@ -442,24 +442,47 @@ export default function AlbumView(props: IProps) {
           </button>
         </div>
       </div>
-      <div
-        ref={viewportRef}
-        className={Style.gridViewport}
-        onScroll={(e) => {
-          const target = e.currentTarget
-          cancelAnimationFrame(rafRef.current)
-          rafRef.current = requestAnimationFrame(() => {
-            setScrollTop(target.scrollTop)
-          })
-        }}
-      >
-        {listError && <div className={Style.empty}>{listError}</div>}
-        {images && images.length === 0 && !listError && (
-          <div className={Style.empty}>相册内没有图片(内容可能已被移动)</div>
-        )}
-        <div className={Style.gridInner} style={{ height: totalHeight }}>
-          {cells}
+      <div className={Style.gridWrap}>
+        <div
+          ref={viewportRef}
+          className={Style.gridViewport}
+          onScroll={(e) => {
+            const target = e.currentTarget
+            cancelAnimationFrame(rafRef.current)
+            rafRef.current = requestAnimationFrame(() => {
+              setScrollTop(target.scrollTop)
+            })
+          }}
+        >
+          {listError && <div className={Style.empty}>{listError}</div>}
+          {images && images.length === 0 && !listError && (
+            <div className={Style.empty}>相册内没有图片(内容可能已被移动)</div>
+          )}
+          <div className={Style.gridInner} style={{ height: totalHeight }}>
+            {cells}
+          </div>
         </div>
+        {/* 大图查看器只覆盖缩略图网格区域:相册工具栏及其上方的一切均不被遮挡 */}
+        {viewer && (
+          <div className={Style.viewer} onClick={() => setViewer(null)}>
+            <div className={Style.viewerBar}>
+              <span className={Style.viewerName}>{viewer.name}</span>
+              <button className={Style.btn} onClick={() => setViewer(null)}>
+                关闭
+              </button>
+            </div>
+            {viewerUrl ? (
+              <div
+                className={Style.viewerBody}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <LunaImageViewer image={viewerUrl} />
+              </div>
+            ) : (
+              <div className={Style.viewerLoading}>原图加载中…</div>
+            )}
+          </div>
+        )}
       </div>
       {confirmDelete && (
         <div className={Style.modalMask}>
@@ -483,26 +506,6 @@ export default function AlbumView(props: IProps) {
               </button>
             </div>
           </div>
-        </div>
-      )}
-      {viewer && (
-        <div className={Style.viewer} onClick={() => setViewer(null)}>
-          <div className={Style.viewerBar}>
-            <span className={Style.viewerName}>{viewer.name}</span>
-            <button className={Style.btn} onClick={() => setViewer(null)}>
-              关闭
-            </button>
-          </div>
-          {viewerUrl ? (
-            <div
-              className={Style.viewerBody}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <LunaImageViewer image={viewerUrl} />
-            </div>
-          ) : (
-            <div className={Style.viewerLoading}>原图加载中…</div>
-          )}
         </div>
       )}
     </div>
