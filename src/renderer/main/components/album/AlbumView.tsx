@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import LunaImageViewer from 'luna-image-viewer/react'
-import uuid from 'licia/uuid'
 import { notify } from 'share/renderer/lib/util'
+import { IStorageBackend } from './backend'
 import { baseName, joinPath, listAlbumImages, uniqueName } from './scanner'
 import Thumb from './Thumb'
 import {
@@ -28,12 +28,14 @@ const SIZE_LABEL: Record<GridSize, string> = {
 
 export interface IClipboard {
   deviceId: string
+  backendId: string
   paths: string[]
 }
 
 interface IProps {
   deviceId: string
   album: IAlbum
+  backend: IStorageBackend
   clipboard: IClipboard | null
   onCopy: (clipboard: IClipboard) => void
   onAlbumChanged: () => void
@@ -41,7 +43,15 @@ interface IProps {
 }
 
 export default function AlbumView(props: IProps) {
-  const { deviceId, album, clipboard, onCopy, onAlbumChanged, onBack } = props
+  const {
+    deviceId,
+    album,
+    backend,
+    clipboard,
+    onCopy,
+    onAlbumChanged,
+    onBack,
+  } = props
 
   const [images, setImages] = useState<IImageItem[] | null>(null)
   const [size, setSize] = useState<GridSize>('medium')
@@ -60,14 +70,19 @@ export default function AlbumView(props: IProps) {
   const [scrollTop, setScrollTop] = useState(0)
   const [viewport, setViewport] = useState({ width: 0, height: 0 })
 
-  const deviceClip = clipboard && clipboard.deviceId === deviceId ? clipboard : null
+  const deviceClip =
+    clipboard &&
+    clipboard.deviceId === deviceId &&
+    clipboard.backendId === backend.id
+      ? clipboard
+      : null
 
   useEffect(() => {
     let alive = true
     setImages(null)
     setSelected(new Set())
     anchorRef.current = -1
-    listAlbumImages(deviceId, album.path).then((items) => {
+    listAlbumImages(deviceId, album.path, backend.listDir).then((items) => {
       if (alive) {
         setImages(items)
       }
@@ -75,7 +90,7 @@ export default function AlbumView(props: IProps) {
     return () => {
       alive = false
     }
-  }, [deviceId, album.path, reloadToken])
+  }, [deviceId, album.path, backend.id, reloadToken])
 
   useEffect(() => {
     const viewportEl = viewportRef.current
@@ -102,7 +117,7 @@ export default function AlbumView(props: IProps) {
       return
     }
     setViewerUrl('')
-    void main.getFileUrl(deviceId, viewer.path).then((url: string) => {
+    void backend.fileUrl(deviceId, viewer.path).then((url: string) => {
       if (alive) {
         setViewerUrl(url)
       }
@@ -166,7 +181,7 @@ export default function AlbumView(props: IProps) {
   }
 
   async function reload() {
-    const items = await listAlbumImages(deviceId, album.path)
+    const items = await listAlbumImages(deviceId, album.path, backend.listDir)
     setImages(items)
     setReloadToken((token) => token + 1)
   }
@@ -181,7 +196,7 @@ export default function AlbumView(props: IProps) {
     for (let i = 0; i < paths.length; i++) {
       setBusy(`删除中 ${i + 1}/${paths.length}…`)
       try {
-        await main.deleteFile(deviceId, paths[i])
+        await backend.deleteFile(deviceId, paths[i])
       } catch {
         failed++
       }
@@ -207,18 +222,13 @@ export default function AlbumView(props: IProps) {
       return
     }
     const existing = new Set((images || []).map((image) => image.name))
-    const temp = await main.getPath('temp')
     let failed = 0
     for (let i = 0; i < deviceClip.paths.length; i++) {
       const src = deviceClip.paths[i]
       setBusy(`复制中 ${i + 1}/${deviceClip.paths.length}…`)
       const name = uniqueName(baseName(src), existing)
-      const dot = name.lastIndexOf('.')
-      const ext = dot > 0 ? name.slice(dot) : ''
       try {
-        const pcTemp = `${temp}/aya-album-${uuid()}${ext}`
-        await main.pullFile(deviceId, src, pcTemp)
-        await main.pushFile(deviceId, pcTemp, joinPath(album.path, name))
+        await backend.copyFile(deviceId, src, joinPath(album.path, name))
         existing.add(name)
       } catch {
         failed++
@@ -258,7 +268,7 @@ export default function AlbumView(props: IProps) {
       }
       if (e.key === 'c' && (e.ctrlKey || e.metaKey)) {
         if (selected.size > 0) {
-          onCopy({ deviceId, paths: [...selected] })
+          onCopy({ deviceId, backendId: backend.id, paths: [...selected] })
           notify(`已复制 ${selected.size} 张图片`)
         }
         return
@@ -319,6 +329,7 @@ export default function AlbumView(props: IProps) {
             mtime={image.mtime}
             square
             selected={isSelected}
+            getUrl={(p) => backend.fileUrl(deviceId, p)}
             onClick={(e) => selectImage(idx, e)}
             onDoubleClick={() => setViewer(image)}
           />
@@ -355,7 +366,7 @@ export default function AlbumView(props: IProps) {
           <button
             className={Style.btn}
             onClick={() => {
-              onCopy({ deviceId, paths: [...selected] })
+              onCopy({ deviceId, backendId: backend.id, paths: [...selected] })
               notify(`已复制 ${selected.size} 张图片`)
             }}
             disabled={selected.size === 0 || !!busy}

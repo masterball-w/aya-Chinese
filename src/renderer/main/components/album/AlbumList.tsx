@@ -1,10 +1,12 @@
 import { useMemo } from 'react'
+import { BackendId, IStorageBackend } from './backend'
 import Thumb from './Thumb'
 import { AlbumSortBy, IAlbum, IScanStats } from './types'
 import Style from './Album.module.scss'
 
 interface IProps {
   deviceId: string
+  backend: IStorageBackend
   albums: IAlbum[]
   sortBy: AlbumSortBy
   onSortChange: (sortBy: AlbumSortBy) => void
@@ -13,6 +15,8 @@ interface IProps {
   onSettings: () => void
   scanning: boolean
   stats: IScanStats | null
+  backendId: BackendId
+  onBackendChange: (id: BackendId) => void
   clipboardCount?: number
 }
 
@@ -26,9 +30,15 @@ function formatTime(mtime: number | null | undefined): string {
   ).padStart(2, '0')}`
 }
 
+const BACKENDS: { id: BackendId; label: string }[] = [
+  { id: 'main', label: '主空间' },
+  { id: 'xspace', label: '隐私空间' },
+]
+
 export default function AlbumList(props: IProps) {
   const {
     deviceId,
+    backend,
     albums,
     sortBy,
     onSortChange,
@@ -37,6 +47,8 @@ export default function AlbumList(props: IProps) {
     onSettings,
     scanning,
     stats,
+    backendId,
+    onBackendChange,
     clipboardCount,
   } = props
 
@@ -56,6 +68,24 @@ export default function AlbumList(props: IProps) {
   return (
     <div className={Style.container}>
       <div className={Style.viewBar}>
+        <div className={Style.sourceSwitch}>
+          {BACKENDS.map((item) => (
+            <button
+              key={item.id}
+              className={`${Style.btn} ${
+                backendId === item.id ? Style.btnActive : ''
+              }`}
+              onClick={() => onBackendChange(item.id)}
+              title={
+                item.id === 'xspace'
+                  ? '需要手机上已安装并运行「AYA 隐私空间助手」'
+                  : undefined
+              }
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
         <button
           className={`${Style.btn} ${Style.btnPrimary}`}
           onClick={onScan}
@@ -109,6 +139,7 @@ export default function AlbumList(props: IProps) {
                     path={album.latest.path}
                     mtime={album.latest.mtime}
                     square
+                    getUrl={(p) => backend.fileUrl(deviceId, p)}
                   />
                 ) : (
                   <div className={Style.thumbPlaceholder}>✕</div>

@@ -59,6 +59,8 @@ export function joinPath(dir: string, name: string): string {
   return dir.endsWith('/') ? dir + name : dir + '/' + name
 }
 
+export type ReadDirFn = (deviceId: string, path: string) => Promise<IFile[]>
+
 export interface IScanOptions {
   deviceId: string
   root: string
@@ -68,6 +70,7 @@ export interface IScanOptions {
   respectNoMedia: boolean
   concurrency: number
   cache: IScanCache
+  readDir: ReadDirFn
   onProgress?: (stats: IScanStats) => void
   isAborted?: () => boolean
 }
@@ -210,6 +213,7 @@ export async function scanDevice(options: IScanOptions): Promise<IScanResult> {
     respectNoMedia,
     concurrency,
     cache,
+    readDir,
     onProgress,
     isAborted,
   } = options
@@ -246,7 +250,7 @@ export async function scanDevice(options: IScanOptions): Promise<IScanResult> {
           stats.reusedDirs++
           stats.images += cached.imgCount
         } else {
-          const files: IFile[] = await main.readDir(deviceId, path)
+          const files: IFile[] = await readDir(deviceId, path)
           const parsed = parseDirListing(path, files)
           stat = toDirStat(expectedMtime, parsed.images, parsed.subdirs, parsed.noMedia)
           stats.readDirs++
@@ -299,16 +303,16 @@ export async function scanDevice(options: IScanOptions): Promise<IScanResult> {
 
 export async function listAlbumImages(
   deviceId: string,
-  albumPath: string
+  albumPath: string,
+  readDir: ReadDirFn
 ): Promise<IImageItem[]> {
-  const files: IFile[] = await main.readDir(deviceId, albumPath)
+  const files: IFile[] = await readDir(deviceId, albumPath)
   const parsed = parseDirListing(albumPath, files)
   const images = [...parsed.images]
 
   const subdirResults = await Promise.all(
     parsed.subdirs.map((subdir) =>
-      main
-        .readDir(deviceId, joinPath(albumPath, subdir.name))
+      readDir(deviceId, joinPath(albumPath, subdir.name))
         .then((subFiles: IFile[]) =>
           parseDirListing(joinPath(albumPath, subdir.name), subFiles)
         )

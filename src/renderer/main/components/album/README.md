@@ -1,8 +1,8 @@
 # AYA 相册插件
 
-在 AYA 中浏览手机相册:自动发现「包含图片集」的文件夹(相册),并以缩略图网格浏览,支持大图查看。
+在 AYA 中浏览手机相册:自动发现「包含图片集」的文件夹(相册),并以缩略图网格浏览,支持大图查看与批量管理。支持**主空间**与**隐私空间**(vivo XSpace,需「AYA 隐私空间助手」)两个数据源。
 
-本插件复用 AYA 已有的 `readDir`(列目录)与 `getFileUrl`(设备端 HTTP 文件服务)接口,不修改 AYA 既有功能代码;新增代码全部位于本目录。
+本插件复用 AYA 已有的接口能力:主空间走 `readDir`/`getFileUrl`/`deleteFile`/`pullFile`/`pushFile`,隐私空间走 xspace 系列接口(`xspaceList`/`xspaceFileUrl`/`xspaceEdit`),不修改 AYA 既有功能代码;新增代码全部位于本目录。
 
 ## 功能
 
@@ -36,7 +36,16 @@
 
 - 删除确认框会明确提示:**ADB 删除不进入手机相册的「最近删除」,不可恢复**;建议重要图片先「复制」到其他相册备份
 - 复制/删除完成后自动触发一次增量重扫,相册列表的数量与封面即时更新
-- 粘贴实现:AYA 无设备端复制接口,插件采用「拉取到电脑临时目录 → 推回手机目标相册」的方式,aya 自带的传输面板会显示进度;会在系统临时目录留下中转文件(命名 `aya-album-*`,由操作系统清理)
+- 主空间粘贴实现:AYA 无设备端复制接口,采用「拉取到电脑临时目录 → 推回手机目标相册」的方式,aya 自带传输面板会显示进度;会在系统临时目录留下中转文件(命名 `aya-album-*`,由操作系统清理)
+- **隐私空间粘贴为设备端直接复制**(助手 `/v1/edit` 的 `copy`),不经电脑中转,速度更快
+
+### 四、隐私空间(vivo XSpace)
+
+- 相册列表左上角可在「主空间 / 隐私空间」之间切换,两边的配置、扫描缓存、剪贴板相互独立
+- 前提:手机上安装并运行「AYA 隐私空间助手」(即 aya「隐私空间」面板所依赖的同一个助手);未安装/未运行时切换会给出中文提示,不影响主空间功能
+- 首次进入隐私空间时自动探测卷根目录(如 `/storage/emulated/666`)并作为扫描根,可在设置中修改
+- 相册发现、浏览、缩略图、批量选择/删除/复制/粘贴能力与主空间完全一致;默认排除规则同样生效(`.vivoFileRecycleBin` 等隐藏目录会被排除)
+- 限制:剪贴板按数据源绑定,**不支持主空间 ↔ 隐私空间互贴**(两端文件系统隔离,助手 API 不提供跨空间写入)
 
 ## 安装
 
@@ -65,7 +74,7 @@
 
 ## 配置项清单
 
-设置入口:相册列表右上角「设置」。配置按设备分别保存在渲染进程 localStorage(`aya-album-config:{设备ID}`)。
+设置入口:相册列表右上角「设置」。**主空间与隐私空间的配置各自独立**,按 `设备ID + 数据源` 保存在渲染进程 localStorage(`aya-album-config:{设备ID}:{main|xspace}`)。
 
 | 配置项 | 默认值 | 说明 |
 | --- | --- | --- |
@@ -79,8 +88,8 @@
 
 其他持久化数据:
 
-- 扫描缓存:`aya-album-cache:{设备ID}`(localStorage)
-- 缩略图缓存:IndexedDB `aya-album-thumbs`(可用浏览器开发者工具清除)
+- 扫描缓存:`aya-album-cache:{设备ID}:{main|xspace}`(localStorage;v1 旧键无后缀,主空间首次加载自动迁移)
+- 缩略图缓存:IndexedDB `aya-album-thumbs`(主/隐私空间路径前缀不同,天然不冲突;可用浏览器开发者工具清除)
 
 ## 已知限制(AYA 接口所限,非实现缺陷)
 
@@ -95,6 +104,7 @@
 | --- | --- | --- |
 | 4 个接入文件的改动可能冲突 | 升级 AYA 源码后,`Tabs.tsx`/`App.tsx`/两个语言文件的接入行可能需要重新套用 | 接入行固定且极小(共 5 行),参照「安装」重打即可;插件目录本身不受影响 |
 | `main.readDir` / `main.getFileUrl` IPC 变更 | 插件只依赖这两个既有接口和 `getDevices`;若上游改名/改签名需同步调整 `scanner.ts`/`Thumb.tsx` | 这两个接口自 AYA 早期版本即存在,稳定性高 |
+| `xspaceList` / `xspaceFileUrl` / `xspaceEdit` 变更 | 隐私空间后端依赖这三个 IPC 与助手 HTTP 协议(`/v1/list` `/v1/raw` `/v1/edit`);助手与 `xspace.ts` 属同批开发,通常一起变更 | 所有 xspace 调用集中在 `backend.ts` 的 `xspaceBackend` 一处,改动范围可控 |
 | IFile 返回结构变更 | 依赖 `name/directory/mtime/size` 字段 | `parseDirListing` 集中解析,只需改一处 |
 | Electron/Chromium 升级 | `createImageBitmap(imageOrientation)`、IndexedDB、WebSocket 等均为稳定标准 API,风险低 | — |
 | localStorage 容量 | 扫描缓存为纯 JSON(每目录约 100 字节,万级目录约 1MB),远低于配额 | 超限时自动放弃持久化,不影响本次使用 |
@@ -110,10 +120,12 @@ npx esbuild --bundle src/renderer/main/components/album/scanner.test.ts \
 npx esbuild --bundle src/renderer/main/components/album/album.e2e.ts \
   --platform=node --format=cjs --outfile=tmp/albumE2E.cjs && node tmp/albumE2E.cjs
 
-# 应用内验证(CDP):启动 AYA 时加 --remote-debugging-port=9229
-node tmp/verifyAlbum.cjs
-node tmp/verifyBatch.cjs
+# 应用内验证(CDP):启动 AYA 时加 --remote-debugging-port=9229,然后
+node src/renderer/main/components/album/verifyAlbum.cjs
+node src/renderer/main/components/album/verifyBatch.cjs
 ```
+
+CDP 验证脚本注意:页面里第一个 `button` 是应用工具栏按钮,定位按钮要按文字匹配,不能按序号。隐私空间相册的 CDP 验证脚本尚未编写(现有两个脚本只覆盖主空间流程,可参照改造:切换数据源按钮文字为「隐私空间」)。
 
 测试目录结构(验收用,可随时删除):`/sdcard/AyaAlbumTest/{album1(6 张)、album2/sub1+sub2(3+3)、few(3 张)、.hidden(6 张)、nomedia(6 张 + .nomedia)}`。删除命令:
 
@@ -125,15 +137,16 @@ adb shell rm -rf /sdcard/AyaAlbumTest
 
 ```
 album/
-├── Album.tsx          面板入口:扫描调度、配置、列表/浏览切换、设置弹窗
-├── AlbumList.tsx      相册列表(发现结果)
-├── AlbumView.tsx      相册内缩略图网格(虚拟滚动、三档尺寸、原图查看)
+├── Album.tsx          面板入口:数据源切换、扫描调度、配置、列表/浏览切换、设置弹窗
+├── AlbumList.tsx      相册列表(发现结果、主空间/隐私空间切换)
+├── AlbumView.tsx      相册内缩略图网格(虚拟滚动、三档尺寸、批量选择/删除/复制粘贴、原图查看)
+├── backend.ts         存储后端抽象:主空间(readDir 系)与隐私空间(xspace 系)双实现
 ├── Thumb.tsx          缩略图组件(降采样、EXIF 方向、IndexedDB 缓存、占位图)
-├── scanner.ts         扫描与相册判定(并发遍历、排除规则、增量缓存)
+├── scanner.ts         扫描与相册判定(并发遍历、排除规则、增量缓存,readDir 由后端注入)
 ├── thumbCache.ts      IndexedDB 缩略图缓存
-├── config.ts          配置与扫描缓存的持久化
+├── config.ts          配置与扫描缓存的持久化(按设备+数据源隔离)
 ├── types.ts           类型定义
 ├── scanner.test.ts    纯逻辑单测
-├── album.e2e.ts       真机端到端测试
+├── album.e2e.ts       真机端到端测试(主空间)
 └── Album.module.scss  样式(跟随 AYA 主题变量)
 ```
